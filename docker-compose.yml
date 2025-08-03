@@ -2,8 +2,7 @@ version: '3.8'
 
 services:
   controller-app:
-    build:
-      context: ./controller-app
+    image: ghcr.io/crisrain/warppool/controller-app:latest
     ports:
       - "8000:8000" # API and WebSocket
       - "10800:10800" # Unified SOCKS5 Proxy
@@ -14,13 +13,25 @@ services:
     container_name: warppool-controller
 
   frontend:
-    build:
-      context: ./frontend
+    image: ghcr.io/crisrain/warppool/frontend:latest
     ports:
       - "5173:5173" # Vite dev server port
     depends_on:
       - controller-app
     container_name: warppool-frontend
+
+  warp-instance:
+    image: ghcr.io/crisrain/warppool/warp-instance:latest
+    ports:
+      - "11001:1080" # Expose SOCKS5 port
+    environment:
+      - TZ=Asia/Shanghai
+    cap_add:
+      - NET_ADMIN
+    devices:
+      - /dev/net/tun:/dev/net/tun
+    restart: unless-stopped
+    container_name: warp-instance-1
 
 # Individual WARP instances are now managed dynamically via the API/UI.
 # You can add them through the web interface after starting the services.
