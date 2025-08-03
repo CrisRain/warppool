@@ -1,167 +1,81 @@
-# WARP 高可用代理池
+# WARP Pool Controller
 
-[![Python](https://img.shields.io/badge/Python-3.9%2B-blue.svg)](https://www.python.org/) [![Docker](https://img.shields.io/badge/Docker-20.10%2B-blue.svg)](https://www.docker.com/) [![FastAPI](https://img.shields.io/badge/FastAPI-latest-green.svg)](https://fastapi.tiangolo.com/) [![License](https://img.shields.io/badge/License-MIT-green.svg)](https://opensource.org/licenses/MIT)
+一个拥有现代化 Web 界面的、支持运行时动态管理的 WARP 实例代理池工具。
 
-一个基于 `warp-cli` 构建的、动态管理、高可用的 SOCKS5/HTTP 代理池。本项目使用 Docker 和 Python (FastAPI) 实现，旨在提供一个稳定、易于扩展的 WARP 代理解决方案。
+## ✨ 功能特性
 
-## ✨ 核心特性
-
-- **动态实例管理**: 根据 `config.yaml` 自动创建和管理多个 WARP 代理实例，无需手动修改 `docker-compose.yml`。
-- **高可用性**: 主控程序自动对代理池进行周期性健康检查，并剔除故障节点，确保 API 始终返回可用代理。
-- **RESTful API**: 提供简单易用的 API，用于获取可用代理和监控代理池状态。
-- **易于部署与扩展**: 基于 Docker 和 Docker Compose，一条命令即可完成部署；修改配置文件即可轻松扩展代理实例数量。
-- **支持 WARP+**: 通过环境变量轻松配置 WARP+ 许可证密钥。
-
-## 🏗️ 系统架构
-
-项目由两部分组成：`主控程序 (controller-app)` 和 `WARP 实例 (warp-instance)`。
-
-```mermaid
-graph TD
-    subgraph "用户"
-        U(Client)
-    end
-
-    subgraph "代理池系统"
-        C(controller-app)
-        W1(warp-instance-1)
-        W2(warp-instance-2)
-        Wn(warp-instance-...)
-    end
-
-    U -- "GET /get_proxy" --> C
-    C -- "返回健康代理" --> U
-    C -- "健康检查" --> W1
-    C -- "健康检查" --> W2
-    C -- "健康检查" --> Wn
-    C -- "管理 (启/停)" --> D(Docker Engine)
-    D -- "创建/销毁容器" --> W1
-    D -- "创建/销毁容器" --> W2
-    D -- "创建/销毁容器" --> Wn
-
-    style C fill:#f9f,stroke:#333,stroke-width:2px
-    style W1 fill:#bbf,stroke:#333,stroke-width:1px
-    style W2 fill:#bbf,stroke:#333,stroke-width:1px
-    style Wn fill:#bbf,stroke:#333,stroke-width:1px
-```
-
-- **controller-app**: FastAPI 应用，作为系统的大脑。它负责：
-  1.  解析 `config.yaml`，通过 Docker SDK 动态启动所需数量的 `warp-instance` 容器。
-  2.  周期性地对所有 `warp-instance` 进行健康检查。
-  3.  提供 API 接口，供客户端获取最健康的代理。
-- **warp-instance**: 运行 `warp-cli` 的容器，提供 SOCKS5 和 HTTP 代理服务。
+- **图形化管理界面**: 通过 Vue.js 和 TailwindCSS 构建的现代化 Web UI，实时监控和管理所有 WARP 实例。
+- **动态实例管理**: 在运行时通过 UI 直接添加、删除、修改 WARP 实例，无需重启服务或修改配置文件。
+- **状态持久化**: 所有实例配置和状态都存储在 SQLite 数据库中，服务重启后数据不丢失。
+- **统一代理入口**: 提供一个单一、稳定的 SOCKS5 代理地址 (`socks5://<your-host>:10800`)，自动将流量转发到健康的 WARP 实例，实现负载均衡和故障转移。
+- **实时状态更新**: 使用 WebSocket 实时推送实例状态到前端，确保数据即时同步。
+- **容器化部署**: 整个应用栈（后端、前端、数据库）通过 Docker Compose 进行管理，一键启动。
 
 ## 🚀 快速开始
 
-#### 1. 环境准备
+### 先决条件
 
-- [Docker](https://docs.docker.com/get-docker/)
+- [Docker](https://www.docker.com/get-started)
 - [Docker Compose](https://docs.docker.com/compose/install/)
 
-#### 2. 项目配置
+### 部署
 
-a. **克隆项目**:
-   ```bash
-   git clone https://github.com/your-repo/warppool.git
-   cd warppool
-   ```
-
-b. **配置 WARP+ (可选)**:
-   如果你有 WARP+ 许可证密钥，创建一个 `.env` 文件：
-   ```ini
-   # .env
-   WARP_LICENSE_KEY=xxxxxxxx-xxxxxxxx-xxxxxxxx
-   ```
-   系统会自动加载此密钥。
-
-c. **配置代理实例**:
-   打开 `controller-app/config.yaml`，根据需求配置代理实例数量和端口。
-
-   ```yaml
-   # controller-app/config.yaml
-   warp_instances:
-     - name: "warp-instance-1"
-       socks5_port: 9091
-       http_proxy_port: 8081
-     - name: "warp-instance-2"
-       socks5_port: 9092
-       http_proxy_port: 8082
-     # - ...可以继续添加更多实例
-
-   health_checker:
-     timeout_seconds: 10
-     check_urls:
-       - "https://www.cloudflare.com/cdn-cgi/trace"
-       - "https://ip.gs"
-   ```
-
-#### 3. 启动服务
-
-只需启动主控程序，它会自动管理 WARP 实例：
-```bash
-docker-compose up --build -d controller-app
-```
-
-#### 4. 验证服务
-
-- **查看容器状态**:
-  ```bash
-  docker ps
-  ```
-  你会看到 `proxy-pool-controller` 以及 `config.yaml` 中定义的所有 `warp-instance-*` 容器正在运行。
-
-- **查看日志**:
-  ```bash
-  docker-compose logs -f controller-app
-  ```
-  日志会显示 WARP 实例的启动和健康检查过程。
-
-## 📚 API 文档
-
-API 服务监听于 `http://localhost:8000`。
-
-| 端点             | 方法 | 描述                                   | 成功响应 (示例)                                                              | 失败响应 (示例)                                       |
-| ---------------- | ---- | -------------------------------------- | ---------------------------------------------------------------------------- | ----------------------------------------------------- |
-| `/`              | GET  | 检查服务是否正在运行。                 | `{"message": "WARP Proxy Pool is running!"}`                                 | -                                                     |
-| `/get_proxy`     | GET  | 获取一个当前可用的健康代理地址。       | `{"proxy": "socks5://127.0.0.1:9091"}`                                        | `{"detail": "No healthy proxies available."}` (503)   |
-| `/status`        | GET  | 获取所有代理实例的详细状态。           | `{"warp-instance-1": {"status": "healthy", "latency_ms": 120}, "warp-instance-2": {"status": "unhealthy"}}` | -                                                     |
-
-## 💡 使用示例
-
-#### 使用 `curl` 测试代理
-
-你可以通过 `curl` 命令使用获取到的 SOCKS5 代理访问网络。
-
-1.  **获取代理**:
+1.  **克隆项目**
     ```bash
-    PROXY_URL=$(curl -s http://localhost:8000/get_proxy | sed -n 's/.*"proxy": "\(.*\)".*/\1/p')
-    echo "使用代理: $PROXY_URL"
+    git clone https://github.com/CrisRain/warppool.git
+    cd warppool
     ```
 
-2.  **通过代理访问**:
+2.  **启动服务**
+    使用 Docker Compose 启动所有服务（后端 API、前端 UI、统一代理）。
     ```bash
-    curl --proxy $PROXY_URL https://www.cloudflare.com/cdn-cgi/trace
+    docker-compose up --build -d
     ```
 
-#### 在终端中设置代理
+3.  **访问 Web UI**
+    在浏览器中打开 `http://localhost:5173` 即可访问管理界面。
 
-```bash
-export ALL_PROXY=$(curl -s http://localhost:8000/get_proxy | sed -n 's/.*"proxy": "\(.*\)".*/\1/p')
+    > **注意**: `5173` 是 Vite 开发服务器的端口。如果前端被构建并由 Nginx 服务（如生产 `Dockerfile` 中所示），端口可能会是 `80` 或其他。请根据 `docker-compose.yml` 中的端口映射进行调整。
 
-# 现在你的终端命令（如 git, curl）将通过该代理
-git clone https://github.com/...
+4.  **添加 WARP 实例**
+    - 在 Web UI 中，点击 "Add Instance" 按钮。
+    - 输入一个唯一的实例名称（例如 `warp-01`）和一个未被占用的 SOCKS5 端口（例如 `11001`）。
+    - 点击 "Add Instance" 提交。
+    - 后端服务会自动拉取 `warp-instance` 镜像并根据你提供的配置启动一个新的 WARP 容器。
+
+5.  **使用统一代理**
+    将你的客户端或应用程序的 SOCKS5 代理设置为 `socks5://localhost:10800`。`controller-app` 会自动将你的请求路由到当前池中一个健康的 WARP 实例。
+
+## 🛠️ 技术栈
+
+- **后端**: FastAPI, SQLAlchemy, Alembic, Docker SDK
+- **前端**: Vue.js, Vite, TailwindCSS, Axios
+- **数据库**: SQLite
+- **代理**: 自定义异步 SOCKS5 代理
+- **部署**: Docker, Docker Compose
+
+## 📂 项目结构
+
+```
+warppool/
+├── docker-compose.yml
+├── README.md
+├── controller-app/
+│   ├── Dockerfile
+│   ├── alembic/
+│   ├── app/
+│   └── data/
+├── frontend/
+│   ├── Dockerfile
+│   └── src/
+└── warp-instance/
+    └── Dockerfile
 ```
 
-## 🔧 停止服务
+## 🤝 贡献
 
-```bash
-docker-compose down
-```
-该命令会停止并移除主控程序和所有由它创建的 WARP 实例容器。
+欢迎提交 Pull Requests。对于重大更改，请先开启一个 issue 来讨论您想要改变的内容。
 
-## 🌟 后续优化建议
+## 📄 许可证
 
-- **高级调度策略**: 实现基于延迟的最低延迟调度或基于 IP 的轮询。
-- **Web UI**: 使用 Streamlit 或一个简单的前端框架为 `/status` 页面创建一个更友好的可视化界面。
-- **日志持久化**: 将日志输出到文件或发送到日志聚合服务（如 ELK, Loki）。
-- **安全性**: 为 API 接口添加认证（如 API Key）。
+[MIT](LICENSE)

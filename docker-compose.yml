@@ -1,23 +1,41 @@
 version: '3.8'
 
-x-warp-instance-template: &warp-instance-template
-  build: ./warp-instance
-  privileged: true
-  restart: always
-  env_file:
-    - .env # Load WARP_LICENSE_KEY from .env file
-
 services:
   controller-app:
-    build: ./controller-app
-    container_name: proxy-pool-controller
-    volumes:
-      - /var/run/docker.sock:/var/run/docker.sock
-      - ./controller-app/config.yaml:/app/config.yaml:ro
+    build:
+      context: ./controller-app
     ports:
-      - "8000:8000" # API port
-    restart: always
+      - "8000:8000" # API and WebSocket
+      - "10800:10800" # Unified SOCKS5 Proxy
+    volumes:
+      - ./controller-app/data:/app/data # Persist SQLite DB
+      - /var/run/docker.sock:/var/run/docker.sock
+    restart: unless-stopped
+    container_name: warppool-controller
 
-# The following services are dynamically generated based on config.yaml
-# and are not managed directly in this file anymore.
-# You can use 'docker-compose up -d controller-app' to start the system.
+  frontend:
+    build:
+      context: ./frontend
+    ports:
+      - "5173:5173" # Vite dev server port
+    depends_on:
+      - controller-app
+    container_name: warppool-frontend
+
+# Individual WARP instances are now managed dynamically via the API/UI.
+# You can add them through the web interface after starting the services.
+# Example of a manually defined service if needed for initial setup:
+#
+# warp-instance-1:
+#   build:
+#     context: ./warp-instance
+#   ports:
+#     - "11001:1080" # Expose SOCKS5 port
+#   environment:
+#     - TZ=Asia/Shanghai
+#   cap_add:
+#     - NET_ADMIN
+#   devices:
+#     - /dev/net/tun:/dev/net/tun
+#   restart: unless-stopped
+#   container_name: warp-instance-1

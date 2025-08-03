@@ -5,3 +5,6 @@ PySocks
 apscheduler
 docker  # Python docker SDK
 PyYAML
+sqlalchemy
+alembic
+websockets
