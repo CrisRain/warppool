@@ -1,0 +1,23 @@
+version: '3.8'
+
+x-warp-instance-template: &warp-instance-template
+  build: ./warp-instance
+  privileged: true
+  restart: always
+  env_file:
+    - .env # Load WARP_LICENSE_KEY from .env file
+
+services:
+  controller-app:
+    build: ./controller-app
+    container_name: proxy-pool-controller
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+      - ./controller-app/config.yaml:/app/config.yaml:ro
+    ports:
+      - "8000:8000" # API port
+    restart: always
+
+# The following services are dynamically generated based on config.yaml
+# and are not managed directly in this file anymore.
+# You can use 'docker-compose up -d controller-app' to start the system.
